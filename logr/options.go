@@ -3,7 +3,6 @@ package logr
 import (
 	"os"
 	"regexp"
-	"strings"
 )
 
 type options struct {
@@ -11,6 +10,7 @@ type options struct {
 	logEncoding                 string
 	logLevel                    string
 	logFile                     string
+	logFileMode                 os.FileMode
 	development                 bool
 	disableStacktrace           bool
 	globalKlog                  bool
@@ -39,8 +39,35 @@ func (l logFileOption) apply(o *options) {
 	o.logFile = string(l)
 }
 
+// WithLogFile enables rotating file output.
+// Each path uses up to ~600 MB: a 100 MB active file plus five uncompressed backups.
+// Rotation and retention are size-based, never age-based.
+// Writers are shared for the process lifetime (one log file path per process).
+// Options apply in order, so a later WithOptionsFromEnv overrides the path with
+// LOFT_LOG_FILE, including when that variable is unset.
 func WithLogFile(path string) Option {
 	return logFileOption(path)
+}
+
+type logFileModeOption os.FileMode
+
+func (m logFileModeOption) apply(o *options) {
+	mode := os.FileMode(m).Perm()
+	if mode != 0 {
+		o.logFileMode = mode
+	}
+}
+
+// WithLogFileMode sets the mode for newly-created active and rotated log files.
+// Modes are enforced on unix only; elsewhere the platform may ignore them (on
+// Windows os.Chmod toggles just the read-only bit).
+// It defaults to 0644, and mode 0 keeps that default.
+// A pre-existing file keeps its own mode, including across rotations, but only where
+// it is narrower than requested: wider bits are removed, so a file pre-placed at the
+// configured path cannot widen what was asked for.
+// Creating another logger for the same path with a different requested mode returns an error.
+func WithLogFileMode(mode os.FileMode) Option {
+	return logFileModeOption(mode)
 }
 
 type logLevelOption string
@@ -109,7 +136,7 @@ func (fromEnvOption) apply(o *options) {
 	o.development = os.Getenv("DEVELOPMENT") == "true"
 	o.disableStacktrace = os.Getenv("LOFT_LOG_DISABLE_STACKTRACE") == "" || os.Getenv("LOFT_LOG_DISABLE_STACKTRACE") != "false"
 	o.logEncoding = GetEncoding()
-	o.logFile = strings.TrimSpace(os.Getenv("LOFT_LOG_FILE"))
+	o.logFile = LogFile()
 	o.logFullCallerPath = LogFullCallerPath()
 	o.logLevel = LoftLogLevel()
 }
