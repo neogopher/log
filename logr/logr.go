@@ -72,7 +72,12 @@ func NewLoggerWithOptions(opts ...Option) (logr.Logger, error) {
 		fields = append(fields, zap.String("component", options.componentName))
 	}
 
-	zapLog, err := config.Build(zap.Fields(fields...))
+	var zapLog *zap.Logger
+	if options.logFile != "" {
+		zapLog, err = buildLoggerWithLogFile(config, fields, options.logFile)
+	} else {
+		zapLog, err = config.Build(zap.Fields(fields...))
+	}
 	if err != nil {
 		return logr.Logger{}, fmt.Errorf("build zap logger: %w", err)
 	}

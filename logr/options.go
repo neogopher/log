@@ -3,12 +3,14 @@ package logr
 import (
 	"os"
 	"regexp"
+	"strings"
 )
 
 type options struct {
 	componentName               string
 	logEncoding                 string
 	logLevel                    string
+	logFile                     string
 	development                 bool
 	disableStacktrace           bool
 	globalKlog                  bool
@@ -29,6 +31,16 @@ func (c componentNameOption) apply(o *options) {
 
 func WithComponentName(name string) Option {
 	return componentNameOption(name)
+}
+
+type logFileOption string
+
+func (l logFileOption) apply(o *options) {
+	o.logFile = string(l)
+}
+
+func WithLogFile(path string) Option {
+	return logFileOption(path)
 }
 
 type logLevelOption string
@@ -97,6 +109,7 @@ func (fromEnvOption) apply(o *options) {
 	o.development = os.Getenv("DEVELOPMENT") == "true"
 	o.disableStacktrace = os.Getenv("LOFT_LOG_DISABLE_STACKTRACE") == "" || os.Getenv("LOFT_LOG_DISABLE_STACKTRACE") != "false"
 	o.logEncoding = GetEncoding()
+	o.logFile = strings.TrimSpace(os.Getenv("LOFT_LOG_FILE"))
 	o.logFullCallerPath = LogFullCallerPath()
 	o.logLevel = LoftLogLevel()
 }
